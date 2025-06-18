@@ -56,5 +56,5 @@
         "temp/": true,
         "Temp/": true
     },
-    "dotnet.defaultSolution": "Hollow Chorus-Development.sln"
+    "dotnet.defaultSolution": "Unity_SummerProject.sln"
 }
