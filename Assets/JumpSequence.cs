@@ -1,16 +1,28 @@
 using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
+using UnityEngine.Events;
+
 public class JumpSequence : MonoBehaviour
 {
-   public List<Transform> jumpPoints;
+    [Header("Jump Path")]
+    public List<Transform> jumpPoints;
+    public float jumpDuration = 0.4f;
+
+    public float jumpArcHeight = 2f;
+
+    private int currentIndex = 0;
+    private bool isJumping = false;
+
+    [Header("Prompt UI")]
     public GameObject promptUI;
 
-    public Transform player;
-    public Transform sister;
-    public Transform raccoon;
+    [Header("Character")]
+    public Transform character;
 
-    public float jumpDuration = 0.4f;
+    [Header("Events")]
+    public UnityEvent OnSequenceStart;
+    public UnityEvent OnSequenceEnd;
 
     private bool playerInRange = false;
     private bool hasTriggered = false;
@@ -25,7 +37,6 @@ public class JumpSequence : MonoBehaviour
     {
         if (other.CompareTag("Player") && !hasTriggered)
         {
-            Debug.Log("Bateu");
             playerInRange = true;
             if (promptUI != null) promptUI.SetActive(true);
         }
@@ -42,66 +53,51 @@ public class JumpSequence : MonoBehaviour
 
     private void Update()
     {
-        if (playerInRange && Input.GetKeyDown(KeyCode.E) && !hasTriggered)
+        if (isJumping) return;
+        if (Input.GetKeyDown(KeyCode.E))
         {
-            hasTriggered = true;
-            if (promptUI != null) promptUI.SetActive(false);
-            StartCoroutine(PlayJumpSequence());
+            if (currentIndex < jumpPoints.Count - 1)
+            {
+                StartCoroutine(JumpTo(character, jumpPoints[currentIndex + 1].position));
+                currentIndex++;
+            }
+        }
+        else if (Input.GetKeyDown(KeyCode.Q)) // Desce
+        {
+            if (currentIndex > 0)
+            {
+                StartCoroutine(JumpTo(character, jumpPoints[currentIndex - 1].position));
+                currentIndex--;
+            }
         }
     }
 
     private IEnumerator PlayJumpSequence()
     {
+        OnSequenceStart?.Invoke(); // Evento utilizavel para ativar codigo antes da sequencia comecar
+
         foreach (Transform point in jumpPoints)
         {
-            yield return JumpTo(player, point.position);
+            yield return JumpTo(character, point.position);
         }
 
-        // Agora trata dos outros personagens
-        yield return new WaitForSeconds(0.5f);
-        StartCoroutine(SendCharacterAcross(sister));
-        StartCoroutine(SendCharacterAcross(raccoon));
+        OnSequenceEnd?.Invoke(); // Evento utilizavel para ativar codigo depois da sequencia acabar
+        hasTriggered = false;
     }
 
     private IEnumerator JumpTo(Transform character, Vector3 destination)
     {
+        isJumping = true;
         Vector3 start = character.position;
         float t = 0f;
         while (t < 1f)
         {
             t += Time.deltaTime / jumpDuration;
-            float height = Mathf.Sin(t * Mathf.PI) * 1.5f;
+            float height = Mathf.Sin(t * Mathf.PI) * jumpArcHeight;
             character.position = Vector3.Lerp(start, destination, t) + Vector3.up * height;
             yield return null;
         }
-        character.position = destination;
+        character.position = destination + new Vector3(0,2,0);
+        isJumping = false;
     }
-
-    private IEnumerator SendCharacterAcross(Transform character)
-    {
-        UnityEngine.AI.NavMeshAgent agent = character.GetComponent<UnityEngine.AI.NavMeshAgent>();
-        if (agent != null) agent.enabled = false;
-        // Encontra o ponto de partida mais próximo do personagem
-        int startIndex = 0;
-        float closestDistance = float.MaxValue;
-
-        for (int i = 0; i < jumpPoints.Count; i++)
-        {
-            float dist = Vector3.Distance(character.position, jumpPoints[i].position);
-            if (dist < closestDistance)
-            {
-                closestDistance = dist;
-                startIndex = i;
-            }
-        }
-
-        // Faz os saltos a partir do ponto encontrado até ao fim da sequência
-        for (int i = startIndex + 1; i < jumpPoints.Count; i++)
-        {
-            yield return new WaitForSeconds(0.3f);
-            yield return JumpTo(character, jumpPoints[i].position);
-        }
-    
-     if (agent != null) agent.enabled = true;
-}
 }
